@@ -1,0 +1,119 @@
+DEBUT(LANG='FR')
+
+
+mesh = LIRE_MAILLAGE(identifier='0:1',
+                     FORMAT='MED',
+                     UNITE=20)
+
+model = AFFE_MODELE(identifier='1:1',
+                    AFFE=_F(MODELISATION='DKT',
+                            PHENOMENE='MECANIQUE',
+                            TOUT='OUI'),
+                    MAILLAGE=mesh)
+
+elempro0 = AFFE_CARA_ELEM(identifier='2:1',
+                          COQUE=_F(COQUE_NCOU=3,
+                                   EPAIS=1.2,
+                                   GROUP_MA=('ELALL', )),
+                          MODELE=model)
+
+mater = DEFI_MATERIAU(identifier='3:1',
+                      ELAS=_F(AMOR_BETA=0.1,
+                              E=110000.0,
+                              NU=0.3,
+                              RHO=8.9e-09))
+
+materfl = AFFE_MATERIAU(identifier='4:1',
+                        AFFE=_F(MATER=(mater, ),
+                                TOUT='OUI'),
+                        MODELE=model)
+
+listr0 = DEFI_LIST_REEL(identifier='5:1',
+                        DEBUT=1.0,
+                        INTERVALLE=_F(JUSQU_A=500.0,
+                                      NOMBRE=1000))
+
+mecabc = AFFE_CHAR_MECA(identifier='6:1',
+                        DDL_IMPO=_F(DRX=0.0,
+                                    DRY=0.0,
+                                    DRZ=0.0,
+                                    DX=0.0,
+                                    DY=0.0,
+                                    DZ=0.0,
+                                    GROUP_MA=('Fix', )),
+                        MODELE=model)
+
+load0 = AFFE_CHAR_MECA(identifier='7:1',
+                       FORCE_NODALE=_F(FZ=1.0,
+                                       GROUP_NO=('force', )),
+                       MODELE=model)
+
+ASSEMBLAGE(identifier='8:1',
+           CARA_ELEM=elempro0,
+           CHAM_MATER=materfl,
+           CHARGE=(mecabc, ),
+           MATR_ASSE=(_F(MATRICE=CO('rigidite'),
+                         OPTION='RIGI_MECA'),
+                      _F(MATRICE=CO('masse'),
+                         OPTION='MASS_MECA'),
+                      _F(MATRICE=CO('amor'),
+                         OPTION='AMOR_MECA')),
+           MODELE=model,
+           NUME_DDL=CO('numeddl'),
+           VECT_ASSE=_F(CHARGE=(load0, ),
+                        OPTION='CHAR_MECA',
+                        VECTEUR=CO('fz')))
+
+vectele0 = CALC_VECT_ELEM(identifier='9:1',
+                          CHARGE=(mecabc, ),
+                          OPTION='CHAR_MECA')
+
+field0 = ASSE_VECTEUR(identifier='14:1',
+                      NUME_DDL=numeddl,
+                      VECT_ELEM=(vectele0, ))
+
+resharm0 = DYNA_VIBRA(identifier='16:1',
+                      BASE_CALCUL='PHYS',
+                      EXCIT=_F(COEF_MULT=1.0,
+                               VECT_ASSE=fz),
+                      LIST_FREQ=listr0,
+                      MATR_AMOR=amor,
+                      MATR_MASS=masse,
+                      MATR_RIGI=rigidite,
+                      TYPE_CALCUL='HARM')
+
+IMPR_RESU(identifier='17:1',
+          RESU=(_F(NOM_CHAM=('DEPL', ),
+                   NOM_CHAM_MED=('depl_reel', ),
+                   PARTIE='REEL',
+                   RESULTAT=resharm0),
+                _F(NOM_CHAM=('DEPL', ),
+                   NOM_CHAM_MED=('depl_imag', ),
+                   PARTIE='IMAG',
+                   RESULTAT=resharm0),
+                _F(NOM_CHAM=('ACCE', ),
+                   NOM_CHAM_MED=('acce_reel', ),
+                   PARTIE='REEL',
+                   RESULTAT=resharm0),
+                _F(NOM_CHAM=('ACCE', ),
+                   NOM_CHAM_MED=('acce_imag', ),
+                   PARTIE='IMAG',
+                   RESULTAT=resharm0)),
+          UNITE=2)
+
+func1 = RECU_FONCTION(identifier='18:1',
+                      GROUP_NO=('post', ),
+                      NOM_CHAM='ACCE',
+                      NOM_CMP='DZ',
+                      RESULTAT=resharm0)
+
+func2 = CALC_FONCTION(identifier='19:1',
+                      EXTRACTION=_F(FONCTION=func1,
+                                    PARTIE='MODULE'))
+
+IMPR_FONCTION(identifier='20:1',
+              COURBE=_F(FONCTION=func2),
+              FORMAT='TABLEAU',
+              UNITE=8)
+
+FIN()

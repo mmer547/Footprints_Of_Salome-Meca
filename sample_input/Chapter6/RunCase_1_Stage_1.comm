@@ -1,0 +1,141 @@
+DEBUT(LANG='FR')
+
+
+mesh = LIRE_MAILLAGE(identifier='0:1',
+                     FORMAT='MED',
+                     UNITE=20)
+
+model = AFFE_MODELE(identifier='1:1',
+                    AFFE=_F(MODELISATION='DKT',
+                            PHENOMENE='MECANIQUE',
+                            TOUT='OUI'),
+                    MAILLAGE=mesh)
+
+elemprop = AFFE_CARA_ELEM(identifier='2:1',
+                          COQUE=_F(COQUE_NCOU=3,
+                                   EPAIS=1.2,
+                                   GROUP_MA=('ELALL', )),
+                          MODELE=model)
+
+mater = DEFI_MATERIAU(identifier='3:1',
+                      ELAS=_F(E=110000.0,
+                              NU=0.3,
+                              RHO=8.9e-09))
+
+materfl = AFFE_MATERIAU(identifier='4:1',
+                        AFFE=_F(MATER=(mater, ),
+                                TOUT='OUI'),
+                        MODELE=model)
+
+listr = DEFI_LIST_REEL(identifier='5:1',
+                       DEBUT=1.0,
+                       INTERVALLE=_F(JUSQU_A=500.0,
+                                     NOMBRE=1000))
+
+mecabc = AFFE_CHAR_MECA(identifier='6:1',
+                        DDL_IMPO=_F(DRX=0.0,
+                                    DRY=0.0,
+                                    DRZ=0.0,
+                                    DX=0.0,
+                                    DY=0.0,
+                                    DZ=0.0,
+                                    GROUP_MA=('Fix', )),
+                        MODELE=model)
+
+load = AFFE_CHAR_MECA(identifier='7:1',
+                      FORCE_NODALE=_F(FZ=1.0,
+                                      GROUP_NO=('force', )),
+                      MODELE=model)
+
+ASSEMBLAGE(identifier='8:1',
+           CARA_ELEM=elemprop,
+           CHAM_MATER=materfl,
+           CHARGE=(mecabc, ),
+           MATR_ASSE=(_F(MATRICE=CO('rigidite'),
+                         OPTION='RIGI_MECA'),
+                      _F(MATRICE=CO('masse'),
+                         OPTION='MASS_MECA')),
+           MODELE=model,
+           NUME_DDL=CO('numeddl'),
+           VECT_ASSE=_F(CHARGE=(load, ),
+                        OPTION='CHAR_MECA',
+                        VECTEUR=CO('fz')))
+
+vectelem = CALC_VECT_ELEM(identifier='9:1',
+                          CHARGE=(mecabc, ),
+                          OPTION='CHAR_MECA')
+
+result = CALC_MODES(identifier='12:1',
+                    CALC_FREQ=_F(FREQ=(0.0, 500.0)),
+                    MATR_MASS=masse,
+                    MATR_RIGI=rigidite,
+                    NORM_MODE=_F(NORME='MASS_GENE'),
+                    OPTION='BANDE')
+
+IMPR_RESU(identifier='13:1',
+          FORMAT='MED',
+          RESU=_F(RESULTAT=result),
+          UNITE=80)
+
+field = ASSE_VECTEUR(identifier='15:1',
+                     NUME_DDL=numeddl,
+                     VECT_ELEM=(vectelem, ))
+
+PROJ_BASE(identifier='17:1',
+          BASE=result,
+          MATR_ASSE_GENE=(_F(MATRICE=CO('rig'),
+                             MATR_ASSE=rigidite),
+                          _F(MATRICE=CO('mas'),
+                             MATR_ASSE=masse)),
+          VECT_ASSE_GENE=_F(TYPE_VECT='FORC',
+                            VECTEUR=CO('fzpro'),
+                            VECT_ASSE=fz))
+
+resharm = DYNA_VIBRA(identifier='21:1',
+                     BASE_CALCUL='GENE',
+                     EXCIT=_F(COEF_MULT=1.0,
+                              VECT_ASSE_GENE=fzpro),
+                     LIST_FREQ=listr,
+                     MATR_MASS=mas,
+                     MATR_RIGI=rig,
+                     TYPE_CALCUL='HARM')
+
+restran = REST_GENE_PHYS(identifier='22:1',
+                         NOM_CHAM=('ACCE', 'DEPL'),
+                         RESU_GENE=resharm)
+
+IMPR_RESU(identifier='23:1',
+          RESU=(_F(NOM_CHAM=('DEPL', ),
+                   NOM_CHAM_MED=('depl_reel', ),
+                   PARTIE='REEL',
+                   RESULTAT=restran),
+                _F(NOM_CHAM=('DEPL', ),
+                   NOM_CHAM_MED=('depl_imag', ),
+                   PARTIE='IMAG',
+                   RESULTAT=restran),
+                _F(NOM_CHAM=('ACCE', ),
+                   NOM_CHAM_MED=('acce_reel', ),
+                   PARTIE='REEL',
+                   RESULTAT=restran),
+                _F(NOM_CHAM=('ACCE', ),
+                   NOM_CHAM_MED=('acce_imag', ),
+                   PARTIE='IMAG',
+                   RESULTAT=restran)),
+          UNITE=2)
+
+func = RECU_FONCTION(identifier='24:1',
+                     GROUP_NO=('post', ),
+                     NOM_CHAM='ACCE',
+                     NOM_CMP='DZ',
+                     RESULTAT=restran)
+
+func0 = CALC_FONCTION(identifier='25:1',
+                      EXTRACTION=_F(FONCTION=func,
+                                    PARTIE='MODULE'))
+
+IMPR_FONCTION(identifier='26:1',
+              COURBE=_F(FONCTION=func0),
+              FORMAT='TABLEAU',
+              UNITE=8)
+
+FIN()

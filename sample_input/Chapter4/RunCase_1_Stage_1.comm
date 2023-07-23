@@ -1,0 +1,82 @@
+DEBUT(LANG='FR')
+
+
+mesh = LIRE_MAILLAGE(identifier='0:1',
+                     FORMAT='MED',
+                     UNITE=20)
+
+modelth = AFFE_MODELE(identifier='1:1',
+                      AFFE=_F(MODELISATION='3D',
+                              PHENOMENE='THERMIQUE',
+                              TOUT='OUI'),
+                      MAILLAGE=mesh)
+
+modmeca = AFFE_MODELE(identifier='2:1',
+                      AFFE=_F(MODELISATION='3D',
+                              PHENOMENE='MECANIQUE',
+                              TOUT='OUI'),
+                      MAILLAGE=mesh)
+
+mater = DEFI_MATERIAU(identifier='3:1',
+                      ELAS=_F(ALPHA=1.73e-05,
+                              E=210000.0,
+                              NU=0.3),
+                      THER=_F(LAMBDA=0.016))
+
+matth = AFFE_MATERIAU(identifier='4:1',
+                      AFFE=_F(MATER=mater,
+                              TOUT='OUI'),
+                      MAILLAGE=mesh)
+
+loadst = AFFE_CHAR_THER(identifier='5:1',
+                        MODELE=modelth,
+                        TEMP_IMPO=(_F(GROUP_MA=('face1', ),
+                                      TEMP=100.0),
+                                   _F(GROUP_MA=('face2', ),
+                                      TEMP=100.0)))
+
+mecabc = AFFE_CHAR_MECA(identifier='6:1',
+                        DDL_IMPO=(_F(DX=0.0,
+                                     DY=0.0,
+                                     DZ=0.0,
+                                     GROUP_MA=('face1', )),
+                                  _F(DX=0.0,
+                                     DY=0.0,
+                                     DZ=0.0,
+                                     GROUP_MA=('face2', ))),
+                        MODELE=modmeca)
+
+resuth = THER_LINEAIRE(identifier='7:1',
+                       CHAM_MATER=matth,
+                       EXCIT=_F(CHARGE=loadst),
+                       MODELE=modelth)
+
+matmeca = AFFE_MATERIAU(identifier='8:1',
+                        AFFE=_F(MATER=mater,
+                                TOUT='OUI'),
+                        AFFE_VARC=_F(EVOL=resuth,
+                                     NOM_VARC='TEMP',
+                                     TOUT='OUI',
+                                     VALE_REF=0.0),
+                        MAILLAGE=mesh,
+                        MODELE=modmeca)
+
+resumeca = MECA_STATIQUE(identifier='9:1',
+                         CHAM_MATER=matmeca,
+                         EXCIT=_F(CHARGE=mecabc),
+                         MODELE=modmeca)
+
+resumeca = CALC_CHAMP(identifier='10:1',
+                      reuse=resumeca,
+                      CONTRAINTE=('SIGM_NOEU', ),
+                      CRITERES=('SIEQ_NOEU', ),
+                      DEFORMATION=('EPSI_NOEU', ),
+                      RESULTAT=resumeca)
+
+IMPR_RESU(identifier='11:1',
+          FORMAT='MED',
+          RESU=(_F(RESULTAT=resuth),
+                _F(RESULTAT=resumeca)),
+          UNITE=80)
+
+FIN()
